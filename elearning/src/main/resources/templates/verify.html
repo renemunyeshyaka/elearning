@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Verify OTP - TechSolutions</title>
+</head>
+<body>
+    <h2>Verify Your OTP</h2>
+    <p>We've sent an OTP to: <span th:text="${email}"></span></p>
+    
+    <div th:if="${error}" style="color: red;">
+        <p th:text="${error}"></p>
+    </div>
+    
+    <div th:if="${success}" style="color: green;">
+        <p th:text="${success}"></p>
+    </div>
+    
+    <form th:action="@{/verify-otp}" method="post">
+        <input type="hidden" name="email" th:value="${email}">
+        <input type="text" name="otp" placeholder="Enter OTP" required maxlength="6">
+        <button type="submit">Verify OTP</button>
+    </form>
+    
+    <form th:action="@{/resend-otp}" method="post">
+        <input type="hidden" name="email" th:value="${email}">
+        <button type="submit">Resend OTP</button>
+    </form>
+    
+    <p><a th:href="@{/login}">Back to Login</a></p>
+</body>
+</html>

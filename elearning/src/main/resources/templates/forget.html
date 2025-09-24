@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Login - TechSolutions</title>
+</head>
+<body>
+    <h2>Login to Your Account</h2>
+    
+    <div th:if="${error}" style="color: red;">
+        <p th:text="${error}"></p>
+    </div>
+    
+    <form th:action="@{/send-otp}" method="post">
+        <input type="email" name="email" placeholder="Enter your email" required>
+        <button type="submit">Send OTP</button>
+    </form>
+    
+    <p><a th:href="@{/}">Back to Home</a></p> </br>
+	<p><a th:href="@{/register}">Register</a></p>
+</body>
+</html>
