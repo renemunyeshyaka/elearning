@@ -4,7 +4,7 @@
     <title>Login - TechSolutions</title>
 </head>
 <body>
-    <h2>Login to Your Account</h2>
+    <h2>TechSolutions - Login to Your Account</h2>
     
     <div th:if="${error}" style="color: red;">
         <p th:text="${error}"></p>
@@ -17,6 +17,6 @@
     
     <p><a th:href="@{/}">Back to Home</a></p> </br>
 	<p><a th:href="@{/register}">Register</a></p>
-	<p><a th:href="@{/register}">Forget Password</a></p>
+	<p><a th:href="@{/forgot-password}">Forget Password</a></p>
 </body>
 </html>

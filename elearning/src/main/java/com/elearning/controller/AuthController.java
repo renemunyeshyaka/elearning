@@ -23,6 +23,9 @@ public class AuthController {
     // In-memory storage for OTPs (use Redis or database in production)
     private Map<String, OtpData> otpStorage = new HashMap<>();
     
+    // In-memory storage for password reset tokens
+    private Map<String, PasswordResetData> passwordResetStorage = new HashMap<>();
+    
     // Simple session storage (use Spring Security in production)
     private Map<String, String> userSessions = new HashMap<>();
 
@@ -31,6 +34,16 @@ public class AuthController {
     public String home(@RequestParam(value = "session", required = false) String sessionId) {
         if (sessionId != null && userSessions.containsKey(sessionId)) {
             return "redirect:/dashboard?session=" + sessionId;
+        }
+        return "index";
+    }
+    
+ // Show login page
+    @GetMapping("/home")
+    public String showHomePage(@RequestParam(value = "error", required = false) String error, 
+                               Model model) {
+        if (error != null) {
+            model.addAttribute("error", "Invalid email or OTP. Please try again.");
         }
         return "home";
     }
@@ -54,13 +67,148 @@ public class AuthController {
         return "register";
     }
     
-  //@GetMapping("/forget")
-    public String showForgetPage(@RequestParam(value = "session", required = false) String error, 
-                               Model model) {
+    // Show forget password page
+    @GetMapping("/forgot-password")
+    public String showForgotPasswordPage(@RequestParam(value = "error", required = false) String error,
+                                        @RequestParam(value = "success", required = false) String success,
+                                        Model model) {
         if (error != null) {
             model.addAttribute("error", "Please enter your valid email address!");
         }
-        return "forget";
+        if (success != null) {
+            model.addAttribute("success", "Password reset instructions sent to your email!");
+        }
+        return "forgot-password";
+    }
+
+    // Process forgot password request
+    @PostMapping("/forgot-password")
+    public String processForgotPassword(@RequestParam("email") String email,
+                                       Model model) {
+        
+        // Basic email validation
+        if (email == null || email.trim().isEmpty() || !isValidEmail(email)) {
+            model.addAttribute("error", "Please enter a valid email address");
+            return "forgot-password";
+        }
+
+        // Generate reset token
+        String resetToken = generateResetToken();
+        
+        // Store reset token with timestamp
+        passwordResetStorage.put(email, new PasswordResetData(resetToken, System.currentTimeMillis()));
+        
+        try {
+            // Send reset link via email
+            String resetLink = "http://localhost:8080/reset-password?token=" + resetToken + "&email=" + email;
+            emailService.sendSimpleMessage(email, "Password Reset Request", 
+                "To reset your password, please click the link below:\n\n" +
+                resetLink + "\n\n" +
+                "This link will expire in 30 minutes.\n\n" +
+                "If you didn't request a password reset, please ignore this email.");
+            
+            return "redirect:/forgot-password?success=true";
+            
+        } catch (Exception e) {
+            model.addAttribute("error", "Failed to send reset email. Please try again.");
+            return "forgot-password";
+        }
+    }
+
+    // Show reset password page
+    @GetMapping("/reset-password")
+    public String showResetPasswordPage(@RequestParam("token") String token,
+                                       @RequestParam("email") String email,
+                                       @RequestParam(value = "error", required = false) String error,
+                                       Model model) {
+        
+        PasswordResetData resetData = passwordResetStorage.get(email);
+        
+        // Check if token exists and is valid
+        if (resetData == null || !resetData.getToken().equals(token)) {
+            model.addAttribute("error", "Invalid or expired reset token.");
+            return "reset-password-error";
+        }
+        
+        // Check if token is expired (30 minutes)
+        long currentTime = System.currentTimeMillis();
+        if ((currentTime - resetData.getTimestamp()) > 30 * 60 * 1000) {
+            passwordResetStorage.remove(email);
+            model.addAttribute("error", "Reset token has expired. Please request a new one.");
+            return "reset-password-error";
+        }
+        
+        model.addAttribute("token", token);
+        model.addAttribute("email", email);
+        
+        if (error != null) {
+            model.addAttribute("error", "Passwords do not match or are invalid.");
+        }
+        
+        return "reset-password";
+    }
+
+    // Process password reset
+    @PostMapping("/reset-password")
+    public String processResetPassword(@RequestParam("token") String token,
+                                      @RequestParam("email") String email,
+                                      @RequestParam("newPassword") String newPassword,
+                                      @RequestParam("confirmPassword") String confirmPassword,
+                                      Model model) {
+        
+        PasswordResetData resetData = passwordResetStorage.get(email);
+        
+        // Validate token
+        if (resetData == null || !resetData.getToken().equals(token)) {
+            model.addAttribute("error", "Invalid or expired reset token.");
+            return "reset-password-error";
+        }
+        
+        // Check if token is expired (30 minutes)
+        long currentTime = System.currentTimeMillis();
+        if ((currentTime - resetData.getTimestamp()) > 30 * 60 * 1000) {
+            passwordResetStorage.remove(email);
+            model.addAttribute("error", "Reset token has expired. Please request a new one.");
+            return "reset-password-error";
+        }
+        
+        // Validate passwords
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            model.addAttribute("error", "Password cannot be empty.");
+            model.addAttribute("token", token);
+            model.addAttribute("email", email);
+            return "reset-password";
+        }
+        
+        if (!newPassword.equals(confirmPassword)) {
+            model.addAttribute("error", "Passwords do not match.");
+            model.addAttribute("token", token);
+            model.addAttribute("email", email);
+            return "reset-password";
+        }
+        
+        // TODO: Implement actual password reset logic here
+        // This is where you would update the user's password in your database
+        // For now, we'll just simulate the reset
+        
+        try {
+            // Remove the used reset token
+            passwordResetStorage.remove(email);
+            
+            // Send confirmation email
+            emailService.sendSimpleMessage(email, "Password Reset Successful", 
+                "Your password has been successfully reset.\n\n" +
+                "If you did not make this change, please contact support immediately.");
+            
+            model.addAttribute("success", "Password has been reset successfully!");
+            return "reset-password-success";
+            
+        } catch (Exception e) {
+            model.addAttribute("error", "Failed to reset password. Please try again.");
+            model.addAttribute("token", token);
+            model.addAttribute("email", email);
+            return "reset-password";
+        }
     }
 
     // Process login request and send OTP
@@ -193,6 +341,10 @@ public class AuthController {
         return String.valueOf(otp);
     }
     
+    private String generateResetToken() {
+        return java.util.UUID.randomUUID().toString();
+    }
+    
     private String generateSessionId() {
         return java.util.UUID.randomUUID().toString();
     }
@@ -216,5 +368,19 @@ public class AuthController {
         public String getOtp() { return otp; }
         public long getTimestamp() { return timestamp; }
         public String getSessionId() { return sessionId; }
+    }
+    
+    // Inner class to store password reset data
+    private static class PasswordResetData {
+        private String token;
+        private long timestamp;
+        
+        public PasswordResetData(String token, long timestamp) {
+            this.token = token;
+            this.timestamp = timestamp;
+        }
+        
+        public String getToken() { return token; }
+        public long getTimestamp() { return timestamp; }
     }
 }
