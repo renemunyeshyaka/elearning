@@ -1,386 +1,300 @@
 package com.elearning.controller;
 
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import com.elearning.dto.*;
+import com.elearning.enums.UserRole;
+import com.elearning.service.AuthService;
+import com.elearning.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-import com.elearning.service.EmailService;
-
-import java.util.Map;
 import java.util.HashMap;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.Map;
 
-@Controller
+@RestController
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = "*")
 public class AuthController {
 
     @Autowired
-    private EmailService emailService;
+    private AuthService authService;
 
-    // In-memory storage for OTPs (use Redis or database in production)
-    private Map<String, OtpData> otpStorage = new HashMap<>();
-    
-    // In-memory storage for password reset tokens
-    private Map<String, PasswordResetData> passwordResetStorage = new HashMap<>();
-    
-    // Simple session storage (use Spring Security in production)
-    private Map<String, String> userSessions = new HashMap<>();
+    @Autowired
+    private UserService userService;
 
-    // Home page - redirects to login or dashboard based on session
-    @GetMapping("/")
-    public String home(@RequestParam(value = "session", required = false) String sessionId) {
-        if (sessionId != null && userSessions.containsKey(sessionId)) {
-            return "redirect:/dashboard?session=" + sessionId;
-        }
-        return "index";
-    }
-    
- // Show login page
-    @GetMapping("/home")
-    public String showHomePage(@RequestParam(value = "error", required = false) String error, 
-                               Model model) {
-        if (error != null) {
-            model.addAttribute("error", "Invalid email or OTP. Please try again.");
-        }
-        return "home";
-    }
+    // Error codes
+    private static final String ERR_VALIDATION = "ERR_400";
+    private static final String ERR_UNAUTHORIZED = "ERR_401";
+    private static final String ERR_FORBIDDEN = "ERR_403";
+    private static final String ERR_NOT_FOUND = "ERR_404";
+    private static final String ERR_CONFLICT = "ERR_409";
+    private static final String ERR_SERVER = "ERR_500";
 
-    // Show login page
-    @GetMapping("/login")
-    public String showLoginPage(@RequestParam(value = "error", required = false) String error, 
-                               Model model) {
-        if (error != null) {
-            model.addAttribute("error", "Invalid email or OTP. Please try again.");
-        }
-        return "login";
-    }
-    
-    //@PostMapping("/register")
-    public String showRegisterPage(@RequestParam(value = "session", required = false) String error, 
-                               Model model) {
-        if (error != null) {
-            model.addAttribute("error", "Please register yourself again!");
-        }
-        return "register";
-    }
-    
-    // Show forget password page
-    @GetMapping("/forgot-password")
-    public String showForgotPasswordPage(@RequestParam(value = "error", required = false) String error,
-                                        @RequestParam(value = "success", required = false) String success,
-                                        Model model) {
-        if (error != null) {
-            model.addAttribute("error", "Please enter your valid email address!");
-        }
-        if (success != null) {
-            model.addAttribute("success", "Password reset instructions sent to your email!");
-        }
-        return "forgot-password";
-    }
-
-    // Process forgot password request
-    @PostMapping("/forgot-password")
-    public String processForgotPassword(@RequestParam("email") String email,
-                                       Model model) {
-        
-        // Basic email validation
-        if (email == null || email.trim().isEmpty() || !isValidEmail(email)) {
-            model.addAttribute("error", "Please enter a valid email address");
-            return "forgot-password";
-        }
-
-        // Generate reset token
-        String resetToken = generateResetToken();
-        
-        // Store reset token with timestamp
-        passwordResetStorage.put(email, new PasswordResetData(resetToken, System.currentTimeMillis()));
-        
+    // Registration Endpoints
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody UserRegistrationDTO registrationDTO) {
         try {
-            // Send reset link via email
-            String resetLink = "http://localhost:8080/reset-password?token=" + resetToken + "&email=" + email;
-            emailService.sendSimpleMessage(email, "Password Reset Request", 
-                "To reset your password, please click the link below:\n\n" +
-                resetLink + "\n\n" +
-                "This link will expire in 30 minutes.\n\n" +
-                "If you didn't request a password reset, please ignore this email.");
-            
-            return "redirect:/forgot-password?success=true";
-            
+            if (registrationDTO.getEmail() == null || registrationDTO.getPassword() == null) {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, "Email and password are required", HttpStatus.BAD_REQUEST
+                ));
+            }
+
+            Map<String, Object> result = authService.registerUser(
+                registrationDTO.getEmail(),
+                registrationDTO.getPassword(),
+                registrationDTO.getFirstName(),
+                registrationDTO.getLastName(),
+                registrationDTO.getPhoneNumber(),
+                registrationDTO.getRole() != null ? registrationDTO.getRole() : UserRole.ROLE_STUDENT
+            );
+
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(createSuccessResponse("Registration initiated successfully", result));
+            } else {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, (String) result.get("message"), HttpStatus.BAD_REQUEST
+                ));
+            }
         } catch (Exception e) {
-            model.addAttribute("error", "Failed to send reset email. Please try again.");
-            return "forgot-password";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse(ERR_SERVER, "Registration failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR));
         }
     }
 
-    // Show reset password page
-    @GetMapping("/reset-password")
-    public String showResetPasswordPage(@RequestParam("token") String token,
-                                       @RequestParam("email") String email,
-                                       @RequestParam(value = "error", required = false) String error,
-                                       Model model) {
-        
-        PasswordResetData resetData = passwordResetStorage.get(email);
-        
-        // Check if token exists and is valid
-        if (resetData == null || !resetData.getToken().equals(token)) {
-            model.addAttribute("error", "Invalid or expired reset token.");
-            return "reset-password-error";
-        }
-        
-        // Check if token is expired (30 minutes)
-        long currentTime = System.currentTimeMillis();
-        if ((currentTime - resetData.getTimestamp()) > 30 * 60 * 1000) {
-            passwordResetStorage.remove(email);
-            model.addAttribute("error", "Reset token has expired. Please request a new one.");
-            return "reset-password-error";
-        }
-        
-        model.addAttribute("token", token);
-        model.addAttribute("email", email);
-        
-        if (error != null) {
-            model.addAttribute("error", "Passwords do not match or are invalid.");
-        }
-        
-        return "reset-password";
-    }
-
-    // Process password reset
-    @PostMapping("/reset-password")
-    public String processResetPassword(@RequestParam("token") String token,
-                                      @RequestParam("email") String email,
-                                      @RequestParam("newPassword") String newPassword,
-                                      @RequestParam("confirmPassword") String confirmPassword,
-                                      Model model) {
-        
-        PasswordResetData resetData = passwordResetStorage.get(email);
-        
-        // Validate token
-        if (resetData == null || !resetData.getToken().equals(token)) {
-            model.addAttribute("error", "Invalid or expired reset token.");
-            return "reset-password-error";
-        }
-        
-        // Check if token is expired (30 minutes)
-        long currentTime = System.currentTimeMillis();
-        if ((currentTime - resetData.getTimestamp()) > 30 * 60 * 1000) {
-            passwordResetStorage.remove(email);
-            model.addAttribute("error", "Reset token has expired. Please request a new one.");
-            return "reset-password-error";
-        }
-        
-        // Validate passwords
-        if (newPassword == null || newPassword.trim().isEmpty()) {
-            model.addAttribute("error", "Password cannot be empty.");
-            model.addAttribute("token", token);
-            model.addAttribute("email", email);
-            return "reset-password";
-        }
-        
-        if (!newPassword.equals(confirmPassword)) {
-            model.addAttribute("error", "Passwords do not match.");
-            model.addAttribute("token", token);
-            model.addAttribute("email", email);
-            return "reset-password";
-        }
-        
-        // TODO: Implement actual password reset logic here
-        // This is where you would update the user's password in your database
-        // For now, we'll just simulate the reset
-        
+    @PostMapping("/verify-registration")
+    public ResponseEntity<?> verifyRegistration(@RequestBody VerifyRequest request) {
         try {
-            // Remove the used reset token
-            passwordResetStorage.remove(email);
+            if (request.getEmail() == null || request.getOtp() == null) {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, "Email and OTP are required", HttpStatus.BAD_REQUEST
+                ));
+            }
+
+            Map<String, Object> result = authService.verifyRegistration(request.getEmail(), request.getOtp());
             
-            // Send confirmation email
-            emailService.sendSimpleMessage(email, "Password Reset Successful", 
-                "Your password has been successfully reset.\n\n" +
-                "If you did not make this change, please contact support immediately.");
-            
-            model.addAttribute("success", "Password has been reset successfully!");
-            return "reset-password-success";
-            
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(createSuccessResponse("Registration verified successfully", result));
+            } else {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, (String) result.get("message"), HttpStatus.BAD_REQUEST
+                ));
+            }
         } catch (Exception e) {
-            model.addAttribute("error", "Failed to reset password. Please try again.");
-            model.addAttribute("token", token);
-            model.addAttribute("email", email);
-            return "reset-password";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse(ERR_SERVER, "Verification failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR));
         }
     }
 
-    // Process login request and send OTP
-    @PostMapping("/send-otp")
-    public String sendOtp(@RequestParam("email") String email, 
-                         RedirectAttributes redirectAttributes,
-                         Model model) {
-        
-        // Basic email validation
-        if (email == null || email.trim().isEmpty() || !isValidEmail(email)) {
-            model.addAttribute("error", "Please enter a valid email address");
-            return "login";
-        }
-
-        // Generate OTP
-        String otp = generateOtp();
-        String sessionId = generateSessionId();
-        
-        // Store OTP with timestamp and session
-        otpStorage.put(email, new OtpData(otp, System.currentTimeMillis(), sessionId));
-        
+    // Login Endpoints
+    @PostMapping("/login/initiate")
+    public ResponseEntity<?> initiateLogin(@RequestBody UserLoginDTO loginDTO) {
         try {
-            // Send OTP via email
-            emailService.sendSimpleMessage(email, "Your Login OTP", 
-                "Your OTP code is: " + otp + "\nThis code will expire in 10 minutes.");
+            if (loginDTO.getEmail() == null) {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, "Email is required", HttpStatus.BAD_REQUEST
+                ));
+            }
+
+            Map<String, Object> result = authService.initiateLogin(loginDTO.getEmail());
             
-            // Add email to model for the verify page
-            model.addAttribute("email", email);
-            return "verify";
-            
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(createSuccessResponse("Login OTP sent successfully", result));
+            } else {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, (String) result.get("message"), HttpStatus.BAD_REQUEST
+                ));
+            }
         } catch (Exception e) {
-            model.addAttribute("error", "Failed to send OTP. Please try again.");
-            return "login";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse(ERR_SERVER, "Login initiation failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR));
         }
     }
 
-    // Verify OTP
-    @PostMapping("/verify-otp")
-    public String verifyOtp(@RequestParam("email") String email,
-                           @RequestParam("otp") String otpInput,
-                           RedirectAttributes redirectAttributes,
-                           Model model) {
-        
-        OtpData otpData = otpStorage.get(email);
-        
-        // Check if OTP exists and is not expired (10 minutes)
-        if (otpData == null) {
-            model.addAttribute("error", "OTP not found or expired. Please request a new one.");
-            model.addAttribute("email", email);
-            return "verify";
-        }
-        
-        // Check if OTP is expired (10 minutes)
-        long currentTime = System.currentTimeMillis();
-        if ((currentTime - otpData.getTimestamp()) > 10 * 60 * 1000) {
-            otpStorage.remove(email);
-            model.addAttribute("error", "OTP has expired. Please request a new one.");
-            model.addAttribute("email", email);
-            return "verify";
-        }
-        
-        // Verify OTP
-        if (otpData.getOtp().equals(otpInput)) {
-            // OTP is valid - create user session
-            userSessions.put(otpData.getSessionId(), email);
-            
-            // Clean up used OTP
-            otpStorage.remove(email);
-            
-            // Redirect to dashboard with session
-            return "redirect:/dashboard?session=" + otpData.getSessionId();
-        } else {
-            model.addAttribute("error", "Invalid OTP. Please try again.");
-            model.addAttribute("email", email);
-            return "verify";
-        }
-    }
-
-    // Dashboard page
-    @GetMapping("/dashboard")
-    public String dashboard(@RequestParam("session") String sessionId, Model model) {
-        String email = userSessions.get(sessionId);
-        
-        if (email == null) {
-            return "redirect:/login?error=session_expired";
-        }
-        
-        model.addAttribute("email", email);
-        model.addAttribute("sessionId", sessionId);
-        return "dashboard";
-    }
-
-    // Resend OTP
-    @PostMapping("/resend-otp")
-    public String resendOtp(@RequestParam("email") String email, Model model) {
-        // Remove existing OTP for this email
-        otpStorage.remove(email);
-        
-        // Generate new OTP
-        String otp = generateOtp();
-        String sessionId = generateSessionId();
-        
-        otpStorage.put(email, new OtpData(otp, System.currentTimeMillis(), sessionId));
-        
+    @PostMapping("/login/verify")
+    public ResponseEntity<?> loginWithOtp(@RequestBody VerifyRequest request) {
         try {
-            emailService.sendSimpleMessage(email, "Your New Login OTP", 
-                "Your new OTP code is: " + otp + "\nThis code will expire in 10 minutes.");
+            if (request.getEmail() == null || request.getOtp() == null) {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, "Email and OTP are required", HttpStatus.BAD_REQUEST
+                ));
+            }
+
+            Map<String, Object> result = authService.loginWithOtp(request.getEmail(), request.getOtp());
             
-            model.addAttribute("email", email);
-            model.addAttribute("success", "New OTP sent successfully!");
-            return "verify";
-            
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(createSuccessResponse("Login successful", result));
+            } else {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_UNAUTHORIZED, (String) result.get("message"), HttpStatus.UNAUTHORIZED
+                ));
+            }
         } catch (Exception e) {
-            model.addAttribute("error", "Failed to send OTP. Please try again.");
-            model.addAttribute("email", email);
-            return "verify";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse(ERR_SERVER, "Login failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR));
         }
     }
 
-    // Logout
-    @GetMapping("/logout")
-    public String logout(@RequestParam("session") String sessionId) {
-        userSessions.remove(sessionId);
-        return "redirect:/login?message=logged_out";
+    // Password-based login
+    @PostMapping("/login/password")
+    public ResponseEntity<?> loginWithPassword(@RequestBody UserLoginDTO loginDTO) {
+        try {
+            if (loginDTO.getEmail() == null || loginDTO.getPassword() == null) {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, "Email and password are required", HttpStatus.BAD_REQUEST
+                ));
+            }
+
+            Map<String, Object> result = authService.loginWithPassword(loginDTO.getEmail(), loginDTO.getPassword());
+            
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(createSuccessResponse("Login successful", result));
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(createErrorResponse(
+                    ERR_UNAUTHORIZED, (String) result.get("message"), HttpStatus.UNAUTHORIZED
+                ));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse(ERR_SERVER, "Login failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR));
+        }
     }
 
-    // Utility methods
-    private String generateOtp() {
-        int otp = ThreadLocalRandom.current().nextInt(100000, 999999);
-        return String.valueOf(otp);
-    }
-    
-    private String generateResetToken() {
-        return java.util.UUID.randomUUID().toString();
-    }
-    
-    private String generateSessionId() {
-        return java.util.UUID.randomUUID().toString();
-    }
-    
-    private boolean isValidEmail(String email) {
-        return email != null && email.matches("^[A-Za-z0-9+_.-]+@(.+)$");
+    // Password Management Endpoints
+    @PostMapping("/password/forgot")
+    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        try {
+            if (request.getEmail() == null) {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, "Email is required", HttpStatus.BAD_REQUEST
+                ));
+            }
+
+            Map<String, Object> result = authService.initiatePasswordReset(request.getEmail());
+            
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(createSuccessResponse("Password reset OTP sent successfully", result));
+            } else {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, (String) result.get("message"), HttpStatus.BAD_REQUEST
+                ));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse(ERR_SERVER, "Password reset initiation failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR));
+        }
     }
 
-    // Inner class to store OTP data with timestamp
-    private static class OtpData {
+    @PostMapping("/password/reset")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+        try {
+            if (request.getEmail() == null || request.getOtp() == null || request.getNewPassword() == null) {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, "Email, OTP and new password are required", HttpStatus.BAD_REQUEST
+                ));
+            }
+
+            Map<String, Object> result = authService.resetPassword(
+                request.getEmail(), 
+                request.getOtp(), 
+                request.getNewPassword()
+            );
+            
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(createSuccessResponse("Password reset successfully", result));
+            } else {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, (String) result.get("message"), HttpStatus.BAD_REQUEST
+                ));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse(ERR_SERVER, "Password reset failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR));
+        }
+    }
+
+    // Health check endpoint
+    @GetMapping("/health")
+    public ResponseEntity<?> healthCheck() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "OK");
+        response.put("service", "Authentication Service");
+        response.put("timestamp", java.time.LocalDateTime.now().toString());
+        response.put("version", "1.0.0");
+        return ResponseEntity.ok(response);
+    }
+
+    // Email availability check
+    @GetMapping("/check-email/{email}")
+    public ResponseEntity<?> checkEmailAvailability(@PathVariable String email) {
+        try {
+            if (email == null || email.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(createErrorResponse(
+                    ERR_VALIDATION, "Email parameter is required", HttpStatus.BAD_REQUEST
+                ));
+            }
+
+            boolean exists = authService.userExists(email);
+            Map<String, Object> response = new HashMap<>();
+            response.put("email", email);
+            response.put("available", !exists);
+            response.put("message", exists ? "Email already registered" : "Email available");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(createErrorResponse(ERR_SERVER, "Email check failed: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR));
+        }
+    }
+
+    // Helper Methods
+    private Map<String, Object> createSuccessResponse(String message, Map<String, Object> data) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", message);
+        response.put("timestamp", java.time.LocalDateTime.now());
+        if (data != null) {
+            response.putAll(data);
+        }
+        return response;
+    }
+
+    private Map<String, Object> createErrorResponse(String errorCode, String message, HttpStatus status) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("error", errorCode);
+        response.put("message", message);
+        response.put("timestamp", java.time.LocalDateTime.now());
+        response.put("status", status.value());
+        return response;
+    }
+
+    // Request DTO classes (inner classes)
+    public static class VerifyRequest {
+        private String email;
         private String otp;
-        private long timestamp;
-        private String sessionId;
-        
-        public OtpData(String otp, long timestamp, String sessionId) {
-            this.otp = otp;
-            this.timestamp = timestamp;
-            this.sessionId = sessionId;
-        }
-        
+
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
         public String getOtp() { return otp; }
-        public long getTimestamp() { return timestamp; }
-        public String getSessionId() { return sessionId; }
+        public void setOtp(String otp) { this.otp = otp; }
     }
-    
-    // Inner class to store password reset data
-    private static class PasswordResetData {
-        private String token;
-        private long timestamp;
-        
-        public PasswordResetData(String token, long timestamp) {
-            this.token = token;
-            this.timestamp = timestamp;
-        }
-        
-        public String getToken() { return token; }
-        public long getTimestamp() { return timestamp; }
+
+    public static class ForgotPasswordRequest {
+        private String email;
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+    }
+
+    public static class ResetPasswordRequest {
+        private String email;
+        private String otp;
+        private String newPassword;
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+        public String getOtp() { return otp; }
+        public void setOtp(String otp) { this.otp = otp; }
+        public String getNewPassword() { return newPassword; }
+        public void setNewPassword(String newPassword) { this.newPassword = newPassword; }
     }
 }

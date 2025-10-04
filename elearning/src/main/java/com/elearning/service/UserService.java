@@ -1,81 +1,60 @@
 package com.elearning.service;
 
-import java.time.LocalDateTime;
-import java.util.Optional;
-import java.util.Random;
-import java.util.UUID;
+import com.elearning.dto.StudentDTO;
+import com.elearning.dto.UserDTO;
+import com.elearning.enums.UserRole;
+import com.elearning.enums.UserStatus;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
+import java.util.List;
+import java.util.Map;
 
-import com.elearning.dto.UserRegistrationDto;
-import com.elearning.entity.User;
-import com.elearning.enums.Role;
-import com.elearning.repository.UserRepository;
+public interface UserService {
+    
+    // ========== GENERAL USER MANAGEMENT METHODS ==========
+    List<UserDTO> getAllUsers();
+    UserDTO getUserById(Long id);
+    UserDTO getUserByEmail(String email);
+    UserDTO getUserByUsername(String username);
+    UserDTO createUser(UserDTO userDTO);
+    UserDTO updateUser(UserDTO userDTO);
+    UserDTO updateUser(Long id, UserDTO userDTO);
+    void deleteUser(Long id);
+    UserDTO updateUserStatus(Long userId, UserStatus status);
+    UserDTO changeUserRole(Long userId, UserRole role);
+    UserDTO unlockAccount(Long userId);
+    List<UserDTO> searchUsers(String keyword);
+    List<UserDTO> getUsersByRole(UserRole role);
+    List<UserDTO> getUsersByStatus(UserStatus status);
+    Long getUserCount();
+    Long getUserCountByRole(UserRole role);
+    Map<String, Long> getUserStatistics();
+    boolean userExists(String email);
+    boolean existsByEmail(String email);
+    UserDTO changePassword(Long userId, String newPassword);
+    void resetPassword(String email, String newPassword);
+    UserDTO updateProfile(Long userId, UserDTO userDTO);
+    List<UserDTO> getRecentlyRegisteredUsers(int days);
+    List<UserDTO> getUsersWithFailedLoginAttempts(int maxAttempts);
+    void incrementLoginAttempts(String email);
+    void resetLoginAttempts(String email);
+    UserDTO updateLastLogin(Long userId);
+    Map<String, Object> getUserDashboardStats();
 
-@Service
-public class UserService {
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private EmailService emailService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    // Register user with email activation
-    public void registerUser(UserRegistrationDto dto) {
-        if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already registered");
-        }
-        User user = new User();
-        user.setUsername(dto.getUsername());
-        user.setEmail(dto.getEmail());
-        user.setPassword(passwordEncoder.encode(dto.getPassword()));
-        user.setRole(Role.USER);
-        user.setEnabled(false);
-        user.setActivationCode(UUID.randomUUID().toString());
-        userRepository.save(user);
-        emailService.sendActivationEmail(user);
-    }
-
-    // Activate account
-    public boolean activateUser(String code) {
-        Optional<User> userOpt = userRepository.findByActivationCode(code);
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
-            user.setEnabled(true);
-            user.setActivationCode(null);
-            userRepository.save(user);
-            return true;
-        }
-        return false;
-    }
-
-    // Generate OTP
-    public void generateAndSendOtp(User user) {
-        String otp = String.valueOf(new Random().nextInt(899999) + 100000);
-        user.setOtpCode(otp);
-        user.setOtpExpiry(LocalDateTime.now().plusMinutes(5));
-        userRepository.save(user);
-        emailService.sendOtpEmail(user.getEmail(), otp);
-    }
-
-    // Verify OTP
-    public boolean verifyOtp(String email, String otp) {
-        Optional<User> userOpt = userRepository.findByEmail(email);
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
-            if (user.getOtpCode().equals(otp) && user.getOtpExpiry().isAfter(LocalDateTime.now())) {
-                user.setOtpCode(null);
-                user.setOtpExpiry(null);
-                userRepository.save(user);
-                return true;
-            }
-        }
-        return false;
-    }
+    // ========== STUDENT-SPECIFIC METHODS ==========
+    List<StudentDTO> getAllStudents();
+    StudentDTO getStudentById(Long id);
+    StudentDTO createStudent(StudentDTO studentDTO);
+    StudentDTO updateStudent(Long id, StudentDTO studentDTO);
+    void deleteStudent(Long id);
+    List<StudentDTO> getStudentsByStatus(UserStatus status);
+    List<StudentDTO> getStudentsByProgress(Double minProgress);
+    Double getAverageProgress();
+    Double getAverageProgressByCourse(Long courseId);
+    Map<String, Object> getStudentCourseProgress(Long studentId);
+    List<StudentDTO> getStudentsByCourse(Long courseId);
+    Long getTotalStudentCount();
+    List<StudentDTO> searchStudents(String keyword);
+    Long getActiveStudentCount();
+    List<StudentDTO> getTopPerformingStudents(int limit);
+    Map<String, Long> getStudentStatistics();
 }

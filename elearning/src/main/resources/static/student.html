@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Management - eLearning</title>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --success: #4cc9f0;
+            --danger: #f72585;
+            --warning: #ff9e00;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray: #6c757d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        /* Filters and Search */
+        .filters-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .filter-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-label {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--gray);
+        }
+
+        .filter-input, .filter-select {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .filter-input:focus, .filter-select:focus {
+            border-color: var(--primary);
+        }
+
+        /* Students Table */
+        .students-table {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .table-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
+            padding: 20px;
+            background: var(--light);
+            font-weight: 600;
+            color: var(--dark);
+            border-bottom: 1px solid #eee;
+        }
+
+        .table-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            align-items: center;
+            transition: background-color 0.3s ease;
+        }
+
+        .table-row:hover {
+            background: #f8f9fa;
+        }
+
+        .table-row:last-child {
+            border-bottom: none;
+        }
+
+        .student-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .student-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .student-details .name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .student-details .email {
+            font-size: 12px;
+            color: var(--gray);
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .status-active {
+            background: #e8f5e8;
+            color: #388e3c;
+        }
+
+        .status-inactive {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--success);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .action-buttons-small {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-edit {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-delete {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .page-btn {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .page-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .page-btn:hover:not(.active) {
+            background: var(--light);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--gray);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus {
+            border-color: var(--primary);
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .filter-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .table-header, .table-row {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1 class="page-title">Student Management</h1>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="openAddStudentModal()">
+                    <i>➕</i> Add Student
+                </button>
+                <button class="btn btn-success">
+                    <i>📥</i> Export
+                </button>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters-section">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label class="filter-label">Search Students</label>
+                    <input type="text" class="filter-input" placeholder="Search by name or email..." id="searchInput">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Status</label>
+                    <select class="filter-select" id="statusFilter">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Progress</label>
+                    <select class="filter-select" id="progressFilter">
+                        <option value="">All Progress</option>
+                        <option value="high">High (75%+)</option>
+                        <option value="medium">Medium (25-75%)</option>
+                        <option value="low">Low (0-25%)</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="applyFilters()">
+                    <i>🔍</i> Apply
+                </button>
+            </div>
+        </div>
+
+        <!-- Students Table -->
+        <div class="students-table">
+            <div class="table-header">
+                <div>Student</div>
+                <div>Status</div>
+                <div>Progress</div>
+                <div>Courses</div>
+                <div>Join Date</div>
+                <div>Actions</div>
+            </div>
+            <div id="studentsContainer">
+                <!-- Students will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination">
+            <!-- Pagination will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Add Student Modal -->
+    <div class="modal" id="addStudentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add New Student</h2>
+                <button class="close-modal" onclick="closeAddStudentModal()">×</button>
+            </div>
+            <form id="addStudentForm">
+                <div class="form-group">
+                    <label class="form-label">First Name</label>
+                    <input type="text" class="form-input" name="firstName" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Last Name</label>
+                    <input type="text" class="form-input" name="lastName" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-input" name="status" required>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-danger" onclick="closeAddStudentModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Student</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Sample student data
+        let students = [
+            { id: 1, firstName: "John", lastName: "Doe", email: "john.doe@email.com", status: "active", progress: 85, courses: 5, joinDate: "2024-01-15", avatar: "JD" },
+            { id: 2, firstName: "Sarah", lastName: "Wilson", email: "sarah.wilson@email.com", status: "active", progress: 92, courses: 7, joinDate: "2024-01-10", avatar: "SW" },
+            { id: 3, firstName: "Mike", lastName: "Chen", email: "mike.chen@email.com", status: "active", progress: 45, courses: 3, joinDate: "2024-02-01", avatar: "MC" },
+            { id: 4, firstName: "Emma", lastName: "Brown", email: "emma.brown@email.com", status: "inactive", progress: 0, courses: 0, joinDate: "2024-01-20", avatar: "EB" },
+            { id: 5, firstName: "Alex", lastName: "Rodriguez", email: "alex.rodriguez@email.com", status: "active", progress: 78, courses: 4, joinDate: "2024-01-25", avatar: "AR" }
+        ];
+
+        let currentPage = 1;
+        const studentsPerPage = 10;
+
+        // Render students table
+        function renderStudents(studentsToRender = students) {
+            const container = document.getElementById('studentsContainer');
+            const startIndex = (currentPage - 1) * studentsPerPage;
+            const paginatedStudents = studentsToRender.slice(startIndex, startIndex + studentsPerPage);
+
+            container.innerHTML = paginatedStudents.map(student => `
+                <div class="table-row">
+                    <div class="student-info">
+                        <div class="student-avatar">${student.avatar}</div>
+                        <div class="student-details">
+                            <div class="name">${student.firstName} ${student.lastName}</div>
+                            <div class="email">${student.email}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="status-badge status-${student.status}">
+                            ${student.status.charAt(0).toUpperCase() + student.status.slice(1)}
+                        </span>
+                    </div>
+                    <div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${student.progress}%"></div>
+                        </div>
+                        <div style="font-size: 12px; margin-top: 5px;">${student.progress}%</div>
+                    </div>
+                    <div>${student.courses} courses</div>
+                    <div>${new Date(student.joinDate).toLocaleDateString()}</div>
+                    <div class="action-buttons-small">
+                        <button class="btn-small btn-edit" onclick="editStudent(${student.id})">Edit</button>
+                        <button class="btn-small btn-delete" onclick="deleteStudent(${student.id})">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+
+            renderPagination(studentsToRender.length);
+        }
+
+        // Render pagination
+        function renderPagination(totalStudents) {
+            const totalPages = Math.ceil(totalStudents / studentsPerPage);
+            const pagination = document.getElementById('pagination');
+            
+            let paginationHTML = '';
+            
+            if (currentPage > 1) {
+                paginationHTML += `<button class="page-btn" onclick="changePage(${currentPage - 1})">Previous</button>`;
+            }
+            
+            for (let i = 1; i <= totalPages; i++) {
+                paginationHTML += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+            }
+            
+            if (currentPage < totalPages) {
+                paginationHTML += `<button class="page-btn" onclick="changePage(${currentPage + 1})">Next</button>`;
+            }
+            
+            pagination.innerHTML = paginationHTML;
+        }
+
+        // Change page
+        function changePage(page) {
+            currentPage = page;
+            renderStudents();
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const progressFilter = document.getElementById('progressFilter').value;
+
+            let filteredStudents = students.filter(student => {
+                const matchesSearch = student.firstName.toLowerCase().includes(searchTerm) || 
+                                    student.lastName.toLowerCase().includes(searchTerm) ||
+                                    student.email.toLowerCase().includes(searchTerm);
+                
+                const matchesStatus = !statusFilter || student.status === statusFilter;
+                
+                let matchesProgress = true;
+                if (progressFilter === 'high') matchesProgress = student.progress >= 75;
+                else if (progressFilter === 'medium') matchesProgress = student.progress >= 25 && student.progress < 75;
+                else if (progressFilter === 'low') matchesProgress = student.progress < 25;
+                
+                return matchesSearch && matchesStatus && matchesProgress;
+            });
+
+            currentPage = 1;
+            renderStudents(filteredStudents);
+        }
+
+        // Modal functions
+        function openAddStudentModal() {
+            document.getElementById('addStudentModal').style.display = 'flex';
+        }
+
+        function closeAddStudentModal() {
+            document.getElementById('addStudentModal').style.display = 'none';
+            document.getElementById('addStudentForm').reset();
+        }
+
+        // Add student
+        document.getElementById('addStudentForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            
+            const newStudent = {
+                id: students.length + 1,
+                firstName: formData.get('firstName'),
+                lastName: formData.get('lastName'),
+                email: formData.get('email'),
+                status: formData.get('status'),
+                progress: 0,
+                courses: 0,
+                joinDate: new Date().toISOString().split('T')[0],
+                avatar: (formData.get('firstName')[0] + formData.get('lastName')[0]).toUpperCase()
+            };
+            
+            students.unshift(newStudent);
+            renderStudents();
+            closeAddStudentModal();
+            
+            // Show success message
+            alert('Student added successfully!');
+        });
+
+        // Edit student
+        function editStudent(id) {
+            const student = students.find(s => s.id === id);
+            if (student) {
+                alert(`Editing student: ${student.firstName} ${student.lastName}`);
+                // In a real app, you would open an edit modal with pre-filled data
+            }
+        }
+
+        // Delete student
+        function deleteStudent(id) {
+            if (confirm('Are you sure you want to delete this student?')) {
+                students = students.filter(student => student.id !== id);
+                renderStudents();
+                alert('Student deleted successfully!');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            renderStudents();
+            
+            // Add real-time search
+            document.getElementById('searchInput').addEventListener('input', applyFilters);
+        });
+    </script>
+</body>
+</html>

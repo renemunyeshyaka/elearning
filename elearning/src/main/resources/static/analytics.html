@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - eLearning</title>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --success: #4cc9f0;
+            --warning: #ff9e00;
+            --danger: #f72585;
+            --light: #f8f9fa;
+            --dark: #212529;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: #f5f7fb;
+            color: var(--dark);
+        }
+
+        .analytics-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .date-filter {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .filter-select {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+        }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .metric-change {
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+
+        .change-positive {
+            background: #e8f5e8;
+            color: #388e3c;
+        }
+
+        .change-negative {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .chart-container {
+            height: 300px;
+            position: relative;
+        }
+
+        /* Progress Bars */
+        .progress-list {
+            list-style: none;
+        }
+
+        .progress-item {
+            margin-bottom: 20px;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        /* Top Courses */
+        .courses-list {
+            list-style: none;
+        }
+
+        .course-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+            gap: 15px;
+        }
+
+        .course-item:last-child {
+            border-bottom: none;
+        }
+
+        .course-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+        }
+
+        .course-info {
+            flex: 1;
+        }
+
+        .course-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .course-stats {
+            font-size: 12px;
+            color: var(--gray);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+            
+            .date-filter {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="analytics-container">
+        <!-- Header -->
+        <div class="header">
+            <h1 class="page-title">Analytics Dashboard</h1>
+            <div class="date-filter">
+                <select class="filter-select" id="timeRange">
+                    <option value="7d">Last 7 Days</option>
+                    <option value="30d" selected>Last 30 Days</option>
+                    <option value="90d">Last 90 Days</option>
+                    <option value="1y">Last Year</option>
+                </select>
+                <select class="filter-select" id="courseFilter">
+                    <option value="">All Courses</option>
+                    <option value="web-dev">Web Development</option>
+                    <option value="data-science">Data Science</option>
+                    <option value="design">UI/UX Design</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div>Total Enrollment</div>
+                <div class="metric-value" id="totalEnrollment">2,847</div>
+                <div class="metric-change change-positive">+12% from last month</div>
+            </div>
+            <div class="metric-card">
+                <div>Completion Rate</div>
+                <div class="metric-value" id="completionRate">68%</div>
+                <div class="metric-change change-positive">+5% from last month</div>
+            </div>
+            <div class="metric-card">
+                <div>Avg. Progress</div>
+                <div class="metric-value" id="averageProgress">72%</div>
+                <div class="metric-change change-positive">+3% from last month</div>
+            </div>
+            <div class="metric-card">
+                <div>Active Students</div>
+                <div class="metric-value" id="activeStudents">1,892</div>
+                <div class="metric-change change-negative">-2% from last month</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <!-- Main Chart -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">Student Progress Over Time</div>
+                    <select class="filter-select">
+                        <option>Weekly</option>
+                        <option>Monthly</option>
+                        <option>Quarterly</option>
+                    </select>
+                </div>
+                <div class="chart-container">
+                    <canvas id="progressChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Progress Distribution -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">Progress Distribution</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="distributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Section -->
+        <div class="charts-grid">
+            <!-- Course Progress -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">Course Completion Progress</div>
+                </div>
+                <ul class="progress-list" id="courseProgressList">
+                    <!-- Will be populated by JavaScript -->
+                </ul>
+            </div>
+
+            <!-- Top Courses -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">Top Performing Courses</div>
+                </div>
+                <ul class="courses-list" id="topCoursesList">
+                    <!-- Will be populated by JavaScript -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Sample data
+        const analyticsData = {
+            enrollment: 2847,
+            completionRate: 68,
+            averageProgress: 72,
+            activeStudents: 1892,
+            
+            progressOverTime: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                data: [65, 59, 80, 81, 76, 72]
+            },
+            
+            progressDistribution: {
+                labels: ['0-25%', '25-50%', '50-75%', '75-100%'],
+                data: [15, 25, 35, 25]
+            },
+            
+            courseProgress: [
+                { name: 'Web Development Bootcamp', progress: 85, students: 324 },
+                { name: 'Data Science Fundamentals', progress: 72, students: 287 },
+                { name: 'UI/UX Design Masterclass', progress: 68, students: 198 },
+                { name: 'Advanced JavaScript', progress: 91, students: 156 },
+                { name: 'Python for Beginners', progress: 78, students: 432 }
+            ],
+            
+            topCourses: [
+                { name: 'Web Development', enrollment: 324, rating: 4.8, icon: '💻' },
+                { name: 'Data Science', enrollment: 287, rating: 4.7, icon: '📊' },
+                { name: 'UI/UX Design', enrollment: 198, rating: 4.9, icon: '🎨' },
+                { name: 'Mobile Development', enrollment: 176, rating: 4.6, icon: '📱' },
+                { name: 'Cloud Computing', enrollment: 154, rating: 4.5, icon: '☁️' }
+            ]
+        };
+
+        // Initialize charts
+        let progressChart, distributionChart;
+
+        function initializeCharts() {
+            // Progress Over Time Chart
+            const progressCtx = document.getElementById('progressChart').getContext('2d');
+            progressChart = new Chart(progressCtx, {
+                type: 'line',
+                data: {
+                    labels: analyticsData.progressOverTime.labels,
+                    datasets: [{
+                        label: 'Average Progress',
+                        data: analyticsData.progressOverTime.data,
+                        borderColor: '#4361ee',
+                        backgroundColor: 'rgba(67, 97, 238, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Distribution Chart
+            const distributionCtx = document.getElementById('distributionChart').getContext('2d');
+            distributionChart = new Chart(distributionCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: analyticsData.progressDistribution.labels,
+                    datasets: [{
+                        data: analyticsData.progressDistribution.data,
+                        backgroundColor: [
+                            '#f72585',
+                            '#ff9e00',
+                            '#4cc9f0',
+                            '#4361ee'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Populate course progress
+        function populateCourseProgress() {
+            const container = document.getElementById('courseProgressList');
+            container.innerHTML = analyticsData.courseProgress.map(course => `
+                <li class="progress-item">
+                    <div class="progress-label">
+                        <span>${course.name}</span>
+                        <span>${course.progress}%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${course.progress}%; background: #4361ee;"></div>
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        ${course.students} students
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        // Populate top courses
+        function populateTopCourses() {
+            const container = document.getElementById('topCoursesList');
+            container.innerHTML = analyticsData.topCourses.map(course => `
+                <li class="course-item">
+                    <div class="course-icon">${course.icon}</div>
+                    <div class="course-info">
+                        <div class="course-name">${course.name}</div>
+                        <div class="course-stats">
+                            ${course.enrollment} students • ⭐ ${course.rating}
+                        </div>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        // Animate metrics
+        function animateMetrics() {
+            const metrics = ['totalEnrollment', 'completionRate', 'averageProgress', 'activeStudents'];
+            const values = [2847, 68, 72, 1892];
+            
+            metrics.forEach((metric, index) => {
+                const element = document.getElementById(metric);
+                let current = 0;
+                const target = values[index];
+                const increment = target / 50;
+                
+                const timer = setInterval(() => {
+                    current += increment;
+                    if (current >= target) {
+                        current = target;
+                        clearInterval(timer);
+                    }
+                    
+                    if (metric === 'completionRate' || metric === 'averageProgress') {
+                        element.textContent = Math.round(current) + '%';
+                    } else {
+                        element.textContent = Math.round(current).toLocaleString();
+                    }
+                }, 30);
+            });
+        }
+
+        // Filter handlers
+        document.getElementById('timeRange').addEventListener('change', function() {
+            // In a real app, this would fetch new data based on the selected time range
+            console.log('Time range changed to:', this.value);
+        });
+
+        document.getElementById('courseFilter').addEventListener('change', function() {
+            // In a real app, this would filter the data based on the selected course
+            console.log('Course filter changed to:', this.value);
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            populateCourseProgress();
+            populateTopCourses();
+            animateMetrics();
+        });
+    </script>
+</body>
+</html>
